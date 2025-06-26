@@ -3940,7 +3940,7 @@ bool wallet2::fast_refresh(uint64_t stop_height, uint64_t &blocks_start_height, 
   std::vector<crypto::hash> hashes;
   uint64_t num_pulls = 0;
 
-  const uint64_t checkpoint_height = m_checkpoints.get_nearest_checkpoint_height(stop_height);
+  const uint64_t checkpoint_height = (stop_height < 1000) ? 0 : m_checkpoints.get_nearest_checkpoint_height(stop_height);
   if ((stop_height > checkpoint_height && m_blockchain.size()-1 < checkpoint_height) && !force)
   {
     // we will drop all these, so don't bother getting them
