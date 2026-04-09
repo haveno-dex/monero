@@ -15507,7 +15507,7 @@ size_t wallet2::import_multisig(std::vector<cryptonote::blobdata> blobs)
   }
 
 
-  refresh(false);
+  //refresh(false); // TODO: commenting out is unnecessary with configuration in https://github.com/monero-project/monero/pull/10405
 
   return n_outputs;
 }

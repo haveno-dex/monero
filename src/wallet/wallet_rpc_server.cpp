@@ -4433,21 +4433,22 @@ namespace tools
       return false;
     }
 
-    if (m_wallet->is_trusted_daemon())
-    {
-      try
-      {
-        m_wallet->rescan_spent();
-      }
-      catch (const std::exception &e)
-      {
-        er.message = std::string("Success, but failed to update spent status after import multisig info: ") + e.what();
-      }
-    }
-    else
-    {
-      er.message = "Success, but cannot update spent status after import multisig info as daemon is untrusted";
-    }
+    // TODO: commenting out is unnecessary with configuration in https://github.com/monero-project/monero/pull/10405
+    // if (m_wallet->is_trusted_daemon())
+    // {
+    //   try
+    //   {
+    //     m_wallet->rescan_spent();
+    //   }
+    //   catch (const std::exception &e)
+    //   {
+    //     er.message = std::string("Success, but failed to update spent status after import multisig info: ") + e.what();
+    //   }
+    // }
+    // else
+    // {
+    //   er.message = "Success, but cannot update spent status after import multisig info as daemon is untrusted";
+    // }
 
     return true;
   }
