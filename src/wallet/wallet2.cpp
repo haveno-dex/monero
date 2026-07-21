@@ -9749,6 +9749,9 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
         chunk_req.outputs.push_back(req.outputs[offset + i]);
 
       const boost::lock_guard<boost::recursive_mutex> lock{m_daemon_rpc_mutex};
+      // Ring member selection above may outlive short remote keep-alive windows.
+      if (offset == 0)
+        m_http_client->disconnect();
       uint64_t pre_call_credits = m_rpc_payment_state.credits;
       chunk_req.client = get_client_signature();
       bool r = epee::net_utils::invoke_http_bin("/get_outs.bin", chunk_req, chunk_daemon_resp, *m_http_client, rpc_timeout);
@@ -10410,11 +10413,8 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
   ptx.construction_data.extra = tx.extra;
   ptx.construction_data.unlock_time = 0;
   ptx.construction_data.use_rct = true;
-  ptx.construction_data.rct_config = {
-    rct::RangeProofPaddedBulletproof,
-    use_fork_rules(HF_VERSION_BULLETPROOF_PLUS, -10) ? 4 : 3
-  };
-  ptx.construction_data.use_view_tags = use_fork_rules(get_view_tag_fork(), 0);
+  ptx.construction_data.rct_config = rct_config;
+  ptx.construction_data.use_view_tags = use_view_tags;
   ptx.construction_data.dests = dsts;
   // record which subaddress indices are being used as inputs
   ptx.construction_data.subaddr_account = subaddr_account;
