@@ -236,6 +236,8 @@ private:
     friend class wallet_device_callback;
   public:
     static constexpr const std::chrono::seconds rpc_timeout = std::chrono::minutes(3) + std::chrono::seconds(30);
+    // shorter timeout for refresh block/hash pulls so a stalled read is detected quickly
+    static constexpr const std::chrono::seconds refresh_rpc_timeout = std::chrono::seconds(60);
 
     enum RefreshType {
       RefreshFull,

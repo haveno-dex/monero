@@ -1034,6 +1034,7 @@ crypto::chacha_key derive_cache_key(const crypto::chacha_key& keys_data_key, con
 namespace tools
 {
 constexpr const std::chrono::seconds wallet2::rpc_timeout;
+constexpr const std::chrono::seconds wallet2::refresh_rpc_timeout;
 const char* wallet2::tr(const char* str) { return i18n_translate(str, "tools::wallet2"); }
 
 gamma_picker::gamma_picker(const std::vector<uint64_t> &rct_offsets, double shape, double scale):
@@ -3194,7 +3195,7 @@ void wallet2::pull_blocks(bool first, bool try_incremental, uint64_t start_heigh
     const boost::lock_guard<boost::recursive_mutex> lock{m_daemon_rpc_mutex};
     uint64_t pre_call_credits = m_rpc_payment_state.credits;
     req.client = get_client_signature();
-    bool r = net_utils::invoke_http_bin("/getblocks.bin", req, res, *m_http_client, rpc_timeout);
+    bool r = net_utils::invoke_http_bin("/getblocks.bin", req, res, *m_http_client, refresh_rpc_timeout);
     THROW_ON_RPC_RESPONSE_ERROR(r, {}, res, "getblocks.bin", error::get_blocks_error, get_rpc_status(res.status));
     THROW_WALLET_EXCEPTION_IF(res.blocks.size() != res.output_indices.size(), error::wallet_internal_error,
         "mismatched blocks (" + boost::lexical_cast<std::string>(res.blocks.size()) + ") and output_indices (" +
@@ -3243,7 +3244,7 @@ void wallet2::pull_hashes(uint64_t start_height, uint64_t &blocks_start_height, 
     const boost::lock_guard<boost::recursive_mutex> lock{m_daemon_rpc_mutex};
     req.client = get_client_signature();
     uint64_t pre_call_credits = m_rpc_payment_state.credits;
-    bool r = net_utils::invoke_http_bin("/gethashes.bin", req, res, *m_http_client, rpc_timeout);
+    bool r = net_utils::invoke_http_bin("/gethashes.bin", req, res, *m_http_client, refresh_rpc_timeout);
     THROW_ON_RPC_RESPONSE_ERROR(r, {}, res, "gethashes.bin", error::get_hashes_error, get_rpc_status(res.status));
     check_rpc_cost("/gethashes.bin", res.credits, pre_call_credits, 1 + res.m_block_ids.size() * COST_PER_BLOCK_HASH);
   }
