@@ -209,6 +209,7 @@ namespace net_utils
 			bool connect(const std::string& addr, const std::string& port, std::chrono::milliseconds timeout)
 		{
 			m_connected = false;
+			m_shutdowned = false; // reset shutdown state so send/recv work on the new connection
 			try
 			{
 				m_ssl_socket->next_layer().close();
