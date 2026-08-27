@@ -1,0 +1,123 @@
+name: ci/gh-actions/release-binaries
+
+# Builds portable monerod + monero-wallet-rpc for each platform via `make depends`,
+# uploads them as artifacts on every run, and attaches them (with sha256 sums) to the
+# GitHub release when a tag is pushed. See docs/developer-guide.md in the haveno repo.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  APT_SET_CONF: |
+    tee -a /etc/apt/apt.conf.d/80-custom << EOF
+    Acquire::Retries "3";
+    Acquire::http::Timeout "120";
+    Acquire::ftp::Timeout "120";
+    EOF
+  CCACHE_SETTINGS: |
+    ccache --max-size=150M
+    ccache --set-config=compression=true
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    container:
+      image: ubuntu:20.04
+      env:
+        DEBIAN_FRONTEND: noninteractive
+        CCACHE_TEMPDIR: /tmp/.ccache-temp
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            host: x86_64-linux-gnu
+            packages: gperf cmake python3-zmq libdbus-1-dev libharfbuzz-dev
+            archive: monero-bins-haveno-linux-x86_64.tar.gz
+          - name: linux-aarch64
+            host: aarch64-linux-gnu
+            packages: python3 gperf g++-aarch64-linux-gnu
+            archive: monero-bins-haveno-linux-aarch64.tar.gz
+          - name: mac
+            host: x86_64-apple-darwin11
+            packages: cmake imagemagick libcap-dev librsvg2-bin libz-dev libbz2-dev libtiff-tools python-dev python3-setuptools-git libtinfo5
+            archive: monero-bins-haveno-mac.tar.gz
+          - name: mac-aarch64
+            host: aarch64-apple-darwin11
+            packages: cmake imagemagick libcap-dev librsvg2-bin libz-dev libbz2-dev libtiff-tools python-dev python3-setuptools-git libtinfo5
+            archive: monero-bins-haveno-mac-aarch64.tar.gz
+          - name: windows
+            host: x86_64-w64-mingw32
+            packages: cmake python3 g++-mingw-w64-x86-64
+            archive: monero-bins-haveno-windows.zip
+    steps:
+      - name: set apt conf
+        run: ${{env.APT_SET_CONF}}
+      - name: install dependencies
+        run: apt update; apt -y install build-essential libtool cmake autotools-dev automake pkg-config python3 gperf bsdmainutils curl git ca-certificates unzip zip ccache ${{ matrix.packages }}
+      - name: configure git
+        run: git config --global --add safe.directory '*'
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: ccache
+        uses: actions/cache@v5
+        with:
+          path: ~/.ccache
+          key: ccache-${{ matrix.host }}-${{ github.sha }}
+          restore-keys: ccache-${{ matrix.host }}-
+      - name: depends cache
+        uses: actions/cache@v5
+        with:
+          path: contrib/depends/built
+          key: depends-${{ matrix.host }}-${{ hashFiles('contrib/depends/packages/*') }}
+          restore-keys: |
+            depends-${{ matrix.host }}-${{ hashFiles('contrib/depends/packages/*') }}
+            depends-${{ matrix.host }}-
+      - name: OSX SDK cache
+        uses: actions/cache@v5
+        with:
+          path: contrib/depends/sdk-sources
+          key: sdk-${{ matrix.host }}
+          restore-keys: sdk-${{ matrix.host }}
+      - name: prepare w64-mingw32
+        if: ${{ matrix.host == 'x86_64-w64-mingw32' }}
+        run: |
+          update-alternatives --set x86_64-w64-mingw32-g++ $(which x86_64-w64-mingw32-g++-posix)
+          update-alternatives --set x86_64-w64-mingw32-gcc $(which x86_64-w64-mingw32-gcc-posix)
+      - uses: ./.github/actions/set-make-job-count
+      - name: build
+        run: |
+          ${{env.CCACHE_SETTINGS}}
+          make depends target=${{ matrix.host }} -j${{env.MAKE_JOB_COUNT}}
+      - name: package binaries
+        run: |
+          bin="build/${{ matrix.host }}/release/bin"
+          archive="${{ matrix.archive }}"
+          case "$archive" in
+            *.zip) ( cd "$bin" && zip "$GITHUB_WORKSPACE/$archive" monerod.exe monero-wallet-rpc.exe ) ;;
+            *)     tar -C "$bin" -zcvf "$archive" monerod monero-wallet-rpc ;;
+          esac
+          sha256sum "$archive" > "$archive.sha256"
+      - name: upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.name }}
+          path: |
+            ${{ matrix.archive }}
+            ${{ matrix.archive }}.sha256
+          if-no-files-found: error
+      - name: attach to release
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ matrix.archive }}
+            ${{ matrix.archive }}.sha256
+          fail_on_unmatched_files: true

@@ -142,7 +142,10 @@ jobs:
       - name: set apt conf
         run: ${{env.APT_SET_CONF}}
       - name: update apt
-        run: apt update
+        run: |
+          # Bullseye security packages were removed from live mirrors after LTS ended
+          sed -i 's|^deb .* bullseye-security |deb [check-valid-until=no] http://snapshot.debian.org/archive/debian-security/20260903T220410Z/ bullseye-security |' /etc/apt/sources.list
+          apt update
       - name: install monero dependencies
         run: ${{env.APT_INSTALL_LINUX}}
       - name: configure git
